@@ -3,10 +3,9 @@
 This is a afternoon experiment to answer the (apparently non-obvious!) question: can you use Pytorch optimizers to learn a 2x2 rotation matrix from a series of examples?  That is, given 
 ```math
 M = \begin{bmatrix}cos(\phi) & -sin(\phi) \\ sin(\phi) & cos(\phi) \end{bmatrix}
-\\
-y = M x
 ```
-Task is to recover $$M'$$ from $$(x,y)$$ supervised pairs.  
+$$y = M x$$
+Task is to recover $M'$ from $(x,y)$ supervised pairs.  
 
 This is interesting because the direction of the gradients lie uniformly on a circle, and so stochastic optimizers seem to struggle!
 
