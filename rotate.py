@@ -60,7 +60,7 @@ def main(phi, N, algo):
 				optimizer = optim.RMSprop(model.parameters(), lr=lr, weight_decay=wd, alpha=0.90)
 				name = "RMSprop"
 			case 9:
-				optimizer = optim.Rprop(model.parameters(), lr=lr)
+				optimizer = optim.Rprop(model.parameters(), lr=lr/20)
 				name = "Rprop"
 			case 10:
 				optimizer = optim.SGD(model.parameters(), lr=lr/20, weight_decay=wd)
