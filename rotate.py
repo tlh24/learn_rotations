@@ -291,8 +291,8 @@ if __name__ == '__main__':
 		for P in range(512+o*16,1024,lod*16):
 			fun(P)
 			
-	def innerfun(M):
-		N = 1024
+	def innerfun(N):
+		M = 1024
 		do_plot(M, N, repeats, device)
 	
 	run_variableLOD(innerfun)
