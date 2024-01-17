@@ -111,87 +111,90 @@ def train(phi, M, N, eplen, algo, scl, device):
 		
 		model = Net(M,N).to(device)
 		lr = 0.01
-		wd = 0.01
-		match algo:
-			case 0:
-				optimizer = optim.Adadelta(model.parameters(), lr=lr*50, weight_decay=wd)
-				name = "Adadelta"
-			case 1:
-				optimizer = optim.Adagrad(model.parameters(), lr=lr*10, weight_decay=wd, lr_decay=0.001)
-				name = "Adagrad"
-			case 2:
-				optimizer = optim.Adam(model.parameters(), lr=lr)
-				name = "Adam"
-			case 3:
-				optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=wd)
-				name = "AdamW"
-			case 4:
-				optimizer = optim.Adamax(model.parameters(), lr=lr, weight_decay=wd)
-				name = "Adamax"
-			case 5:
-				optimizer = optim.ASGD(model.parameters(), lr=lr, weight_decay=wd)
-				name = "ASGD"
-			case 6:
-				optimizer = optim.NAdam(model.parameters(), lr=lr, weight_decay=wd)
-				name = "NAdam"
-			case 7:
-				optimizer = optim.RAdam(model.parameters(), lr=lr, weight_decay=wd)
-				name = "RAdam"
-			case 8:
-				optimizer = optim.RMSprop(model.parameters(), lr=lr, weight_decay=wd, alpha=0.90)
-				name = "RMSprop"
-			case 9:
-				optimizer = optim.Rprop(model.parameters(), lr=lr)
-				name = "Rprop"
-			case 10:
-				optimizer = optim.SGD(model.parameters(), lr=lr*10, weight_decay=wd)
-				name = "SGD"
-			case 11:
-				optimizer = Lion(model.parameters(), lr=lr, weight_decay=wd)
-				name = "Lion"
-		
-		for i in range(eplen): 
-			x = random_unit_vectors(batch_size, M, device)
-			x = x.unsqueeze(1)
-			y = (x @ m) * scl
-			model.zero_grad()
-			p = model(x)
-			loss = torch.sum((y - p)**2)
-			loss.backward()
-			torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0) # essential!
-			# otherwise, get oscillations, seemingly due to term-coupling.
-			optimizer.step()
-			trainlosses[k,i] = loss.detach() / batch_size
+		wd = 0.00
+		if algo < 12:
+			match algo:
+				case 0:
+					optimizer = optim.Adadelta(model.parameters(), lr=lr*50, weight_decay=wd)
+					name = "Adadelta"
+				case 1:
+					optimizer = optim.Adagrad(model.parameters(), lr=lr*10, weight_decay=wd, lr_decay=0.001)
+					name = "Adagrad"
+				case 2:
+					optimizer = optim.Adam(model.parameters(), lr=lr)
+					name = "Adam"
+				case 3:
+					optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=wd)
+					name = "AdamW"
+				case 4:
+					optimizer = optim.Adamax(model.parameters(), lr=lr, weight_decay=wd)
+					name = "Adamax"
+				case 5:
+					optimizer = optim.ASGD(model.parameters(), lr=lr, weight_decay=wd)
+					name = "ASGD"
+				case 6:
+					optimizer = optim.NAdam(model.parameters(), lr=lr, weight_decay=wd)
+					name = "NAdam"
+				case 7:
+					optimizer = optim.RAdam(model.parameters(), lr=lr, weight_decay=wd)
+					name = "RAdam"
+				case 8:
+					optimizer = optim.RMSprop(model.parameters(), lr=lr, weight_decay=wd, alpha=0.90)
+					name = "RMSprop"
+				case 9:
+					optimizer = optim.Rprop(model.parameters(), lr=lr)
+					name = "Rprop"
+				case 10:
+					optimizer = optim.SGD(model.parameters(), lr=lr*10, weight_decay=wd)
+					name = "SGD"
+				case 11:
+					optimizer = Lion(model.parameters(), lr=lr, weight_decay=wd)
+					name = "Lion"
 			
-			with torch.no_grad(): 
-				# new data!
+			for i in range(eplen): 
 				x = random_unit_vectors(batch_size, M, device)
 				x = x.unsqueeze(1)
 				y = (x @ m) * scl
+				model.zero_grad()
 				p = model(x)
 				loss = torch.sum((y - p)**2)
-				testlosses[k,i] = loss.detach() / batch_size
+				loss.backward()
+				torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0) # essential!
+				# otherwise, get oscillations, seemingly due to term-coupling.
+				optimizer.step()
+				trainlosses[k,i] = loss.detach() / batch_size
+				
+				with torch.no_grad(): 
+					# new data!
+					x = random_unit_vectors(batch_size, M, device)
+					x = x.unsqueeze(1)
+					y = (x @ m) * scl
+					p = model(x)
+					loss = torch.sum((y - p)**2)
+					testlosses[k,i] = loss.detach() / batch_size
 			
-	# do the same for linear regression (positive control)
-	if algo == 0 :
-		x = random_unit_vectors(M*2, M, device=torch.device("cpu"))
-		# x = torch.nn.functional.pad(x, (0,fxsiz-siz), "constant", 1)
-		# x = random_unit_vectors(siz*3, siz, device=torch.device("cpu"))
-		m_ = m.cpu().numpy() # re-use the matrix
-		y = x @ m_
-		u, s, vh = np.linalg.svd(y)
-		rank = np.sum(s > 1e-4)
-		print(f'rank of mapping: {rank}; [{M},{N}]')
-		mp = np.linalg.lstsq(x, y, rcond=None)[0]
-		x = random_unit_vectors(2*M, M, device=torch.device("cpu"))
-		y = x @ m_
-		p = x @ mp
-		loss = torch.sum((y - p)**2)
-		print(f"loss on via linear regression {loss} size [{M},{N}]")
-	else:
-		if algo == 11:
-			print(f'done with [{M},{N}]')
-	return trainlosses, testlosses, name
+		# do the same for linear regression (positive control)
+		if algo == 12 and k == 0:
+			name = "SVD"
+			x = random_unit_vectors(M*2, M, device=torch.device("cpu"))
+			# x = torch.nn.functional.pad(x, (0,fxsiz-siz), "constant", 1)
+			# x = random_unit_vectors(siz*3, siz, device=torch.device("cpu"))
+			m_ = m.cpu().numpy() # re-use the matrix
+			y = x @ m_
+			u, s, vh = np.linalg.svd(y)
+			rank = np.sum(s > 1e-4)
+			print(f'rank of mapping: {rank}; [{M},{N}]') # check! 
+			mp = np.linalg.lstsq(x, y, rcond=None)[0]
+			x = random_unit_vectors(2*M, M, device=torch.device("cpu"))
+			y = x @ m_
+			p = x @ mp
+			nulloss = torch.sum((y)**2)
+			testlosses[k,0] = nulloss / batch_size # for snr calc
+			loss = torch.sum((y - p)**2)
+			testlosses[k,1] = loss / batch_size
+			print(f"loss on via linear regression {loss}; done with [{M},{N}]")
+	
+	return trainlosses,testlosses,name
 
 def linalg_test(): 
 	N = 32
@@ -227,6 +230,9 @@ def do_plot(M, N, repeats, device):
 	figsize = (18, 15)
 	fig, ax = plt.subplots(plot_rows, plot_cols, figsize=figsize)
 	
+	eplen = 500
+	lossall = np.zeros((13,repeats,eplen))
+	
 	# normalize the l2 norm of y (x is always a unit vector)
 	if M != N:
 		scl = calc_scale(M, N, device)
@@ -239,60 +245,124 @@ def do_plot(M, N, repeats, device):
 	for i in range(repeats):
 		phi[i,:,:] = make_ortho_matrix(M, N)
 	
-	for algo in range(12):
-		trainlosses,testlosses,name = train(phi, M, N, 500, algo, scl, device)
-		r = algo // 4
-		c = algo % 4
-		ax[r,c].plot(np.log(trainlosses.T))
-		ax[r,c].plot(np.log(testlosses.T))
-		ax[r,c].set_title(f"{name} [{M},{N}]")
-		if M > N: 
-			ax[r,c].set_ylim(ymin=-7, ymax=1.5)
-		if M < N: 
-			ax[r,c].set_ylim(ymin=-20, ymax=5.0)
-		if M == N: 
-			ax[r,c].set_ylim(ymin=-20, ymax=1.5)
-		ax[r,c].tick_params(left=True)
-		ax[r,c].tick_params(right=True)
-		ax[r,c].tick_params(bottom=True)
+	names = []
+	for algo in range(13):
+		trainlosses,testlosses,name = train(phi, M, N, eplen, algo, scl, device)
+		lossall[algo,:,:] = testlosses
+		names.append(name)
+		if algo < 12: 
+			r = algo // 4
+			c = algo % 4
+			ax[r,c].plot(np.log(trainlosses.T))
+			ax[r,c].plot(np.log(testlosses.T))
+			ax[r,c].set_title(f"{name} [{M},{N}]")
+			if M > N: 
+				ax[r,c].set_ylim(ymin=-7, ymax=1.5)
+			if M < N: 
+				ax[r,c].set_ylim(ymin=-20, ymax=5.0)
+			if M == N: 
+				ax[r,c].set_ylim(ymin=-20, ymax=1.5)
+			ax[r,c].tick_params(left=True)
+			ax[r,c].tick_params(right=True)
+			ax[r,c].tick_params(bottom=True)
 
 	if M > N:
 		fig.savefig(f'fixed_M_variable_N/rotate_loss__wd1e-2_size{N}.png', bbox_inches='tight')
 	if M < N: 
 		fig.savefig(f'variable_M_fixed_N/rotate_loss__wd1e-2_size{M}.png', bbox_inches='tight')
 	if M == N: 
-		fig.savefig(f'variable_M_variable_N/rotate_loss__wd1e-2_size{M}.png', bbox_inches='tight')
+		fig.savefig(f'variable_M_variable_N_wd0/rotate_loss__wd1e-2_size{M}.png', bbox_inches='tight')
 	plt.close(fig)
+	return lossall,names
 
 if __name__ == '__main__':
 	# # Initialize parser
 	parser = argparse.ArgumentParser()
 	parser.add_argument("-o", "--offset", type=int, choices=range(0,10), default=0, help="set the offset for iteration")
 	parser.add_argument("-l", "--lod", type=int, choices=range(0,10), default=2, help="set the level of detail")
+	parser.add_argument("-r", "--repeats", type=int, choices=range(1,10), default=5, help="number of replicates")
 	parser.add_argument("-c", "--cuda", type=int, choices=range(0,2), default=0, help="set the CUDA device")
+	parser.add_argument("-m", "--mode", type=int, choices=range(0,3), default=0, help="set the mode. 0 = variable M variable N; 1 = fixed M variable N; 2 = variable M fixed N")
 	args = parser.parse_args()
 	o = args.offset
 	lod = args.lod
-	repeats = 5
+	repeats = args.repeats
 
 	device = torch.device(type='cuda', index=args.cuda)
 	
 	# for siz in range(1019, 1024):
 	# 	do_plot(N, siz, repeats, device)
 	def run_variableLOD(fun): 
+		lossall = []
 		for P in range(4+o,64,lod):
-			fun(P)
+			m,n,la,names = fun(P)
+			lossall.append((m,n,la))
 		for P in range(64+o*2,128,lod*2):
-			fun(P)
+			m,n,la,names = fun(P)
+			lossall.append((m,n,la))
 		for P in range(128+o*4,256,lod*4):
-			fun(P)
+			m,n,la,names = fun(P)
+			lossall.append((m,n,la))
 		for P in range(256+o*8,512,lod*8):
-			fun(P)
+			m,n,la,names = fun(P)
+			lossall.append((m,n,la))
 		for P in range(512+o*16,1024,lod*16):
-			fun(P)
+			m,n,la,names = fun(P)
+			lossall.append((m,n,la))
+		return lossall,names
 			
-	def innerfun(N):
+	def fixed_M_variable_N(N):
 		M = 1024
-		do_plot(M, N, repeats, device)
-	
-	run_variableLOD(innerfun)
+		lossall,names = do_plot(M, N, repeats, device)
+		return M,N,lossall,names
+		
+	def variable_M_variable_N(N):
+		M = N
+		lossall,names = do_plot(M, N, repeats, device)
+		return M,N,lossall,names
+		
+	def variable_M_fixed_N(M):
+		N = 1024
+		lossall,names = do_plot(M, N, repeats, device)
+		return M,N,lossall,names
+		
+	def snr_plot(fun, xaxisname, figname): 
+		lossall,names = run_variableLOD(fun)
+		
+		plot_rows = 3
+		plot_cols = 5
+		figsize = (20, 15)
+		fig, ax = plt.subplots(plot_rows, plot_cols, figsize=figsize)
+		snr = np.zeros((13,len(lossall)))
+		os = np.zeros((len(lossall),))
+		for algo in range(13): 
+			for i in range(len(lossall)): 
+				m,n,ls = lossall[i]
+				if algo < 12: 
+					sta = np.mean(ls[algo,:,:4])
+					fin = np.mean(ls[algo,:,-4:])
+				else: 
+					sta = np.mean(ls[algo,0,0]) # only one repeat for linear regression
+					fin = np.mean(ls[algo,0,1])
+				os[i] = min(m,n)
+				snr[algo,i] = 10 * (np.log10(sta) - np.log10(fin))
+				
+			r = algo // 5
+			c = algo % 5
+			ax[r,c].semilogx(os, snr[algo,:])
+			ax[r,c].set_title(f"{names[algo]}")
+			ax[r,c].set_xlabel(xaxisname)
+			ax[r,c].tick_params(left=True)
+			ax[r,c].tick_params(right=True)
+			ax[r,c].tick_params(bottom=True)
+		
+		fig.savefig(f'{figname}.png', bbox_inches='tight')
+		fig.savefig(f'{figname}.eps', format='eps', bbox_inches='tight')
+		plt.show()
+
+	if args.mode == 0: 
+		snr_plot(variable_M_variable_N, "[N,N]", "variable_M_variable_N_wd0")
+	if args.mode == 1: 
+		snr_plot(fixed_M_variable_N, "[1024,N]", "fixed_M_variable_N")
+	if args.mode == 2: 
+		snr_plot(variable_M_fixed_N, "[M,1024]", "variable_M_fixed_N")
