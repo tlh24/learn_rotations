@@ -41,7 +41,7 @@ The size of $\Phi$ is systematically varied by sweeping M and N from [4 .. 1024)
 
 Above, results for "fat" matrices: M < N, with M plotted on the x-axis, SNR in dB on the y-axis.  The model needs to predict 1024 dimensions using a smaller $x$ - e.g. $y$ is 1024 dimensional but has a lower rank, plotted on the x-axis.  
 * Most algorithms show power-law decay of SNR with increasing rank.  
-* Rprop is great at low rank, shows a sharp transition around 60 - not sure why?  
+* Rprop is great at low rank, shows a sharp transition around 60 - likely solved with more compute.  
 * ASGD is non-monotonic, but note performance is always low.  
 * The Adam family is good at low rank, but decays to zero with increasing dims.  (And yet it's the winner for transformers..?) 
 * Adagrad is the high-D winner
@@ -52,6 +52,7 @@ Results for "skinny" matrices: M > N, with N plotted on the x-axis, SNR in dB on
 * Adam, AdamW, NAdam and RMSprop all work equivalently OK when $y$ is low-D; 
 * RAdam has a "sweet spot" (?)
 * Adagrad also has a strong sweet spot, and works somewhat when $y$ is high-D; 
+* Rprop fares so poorly compared to "fat" matrices! 
 * The rest don't work well.  
 
 ![](variable_M_variable_N_wd0.png)
