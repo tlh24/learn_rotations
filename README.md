@@ -21,7 +21,7 @@ class Net(nn.Module):
 		return y
 ```
 Training details: 
-* Bias was left on -- of course it's not needed, but it did not seem to affect the results.  
+* Bias was left on -- of course it's not needed, but it did not seem to affect results.  
 * Batch size is fixed at 32.
 * 500 batches were presented during training; from inspection (see movies) this is sufficient except for a few slow cases (SGD).
 * Reported figures are for test loss; however, there was never any difference between test and train loss (unsurprisingly).  
