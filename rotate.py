@@ -67,22 +67,11 @@ def make_ortho_matrix(M, N):
 	phi = torch.tensor(ortho_group.rvs(dim=dim))
 	return phi[:M, :N]
 
-# def make_rr_matrix(siz, rank):
-# 	# make a non-orthogonal normal matrix with rank less than size
-# 	o = torch.tensor(ortho_group.rvs(dim=siz), dtype=torch.float32)
-# 	if siz > rank:
-# 		o = o[:, :rank]
-# 		r = torch.randn(rank, siz-rank)
-# 		m = o @ r
-# 		m = torch.nn.functional.normalize(m, dim=0, p=2)
-# 		o = torch.cat((o,m), dim=1)
-# 		# # test -- result is not normed??
-# 		# x = random_unit_vectors(32, siz, o.device)
-# 		# x = x.unsqueeze(1)
-# 		# y = x @ o
-# 		# y = y.squeeze()
-# 		# print(torch.norm(y, dim=1))
-# 	return o
+def make_rr_matrix(siz, rank):
+	# make a non-orthogonal normal matrix with rank less than size
+	o = torch.tensor(ortho_group.rvs(dim=siz), dtype=torch.float32)
+	p = torch.tensor(ortho_group.rvs(dim=siz), dtype=torch.float32)
+	return o[:,:rank] @ p[:, :rank].T
 
 # def make_rrz_matrix(siz, rank):
 # 	# make a non-orthogonal normal matrix with rank less than size

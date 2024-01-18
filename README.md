@@ -9,6 +9,9 @@ $$y = x \Phi$$
 The task is to recover $\Phi'$ from $(x,y)$ supervised pairs.  
 (Note that $\Phi$ is scaled so that $y$ (length N) is also a unit vector.  This is to reduce gradient scaling issues.)
 
+This is the "matrix sensing problem", which there is an extensive literature of, eg. https://arxiv.org/abs/2301.11500
+The results presented are an empirical investigation to the problem with controlled rank and exact parameterization, to expose the behavior of commonly-used optimizers.  
+
 The network being trained is as simple as possible: 
 ```
 class Net(nn.Module): 
@@ -41,10 +44,10 @@ The size of $\Phi$ is systematically varied by sweeping M and N from [4 .. 1024)
 
 Above, results for "fat" matrices: M < N, with M plotted on the x-axis, SNR in dB on the y-axis.  The model needs to predict 1024 dimensions using a smaller $x$ - e.g. $y$ is 1024 dimensional but has a lower rank, plotted on the x-axis.  
 * Most algorithms show power-law decay of SNR with increasing rank.  
-* Rprop is great at low rank, shows a sharp transition around 60 - likely solved with more compute.  
+* Rprop is great at low rank, shows a sharp transition around 60 - it is compute-limited.  
 * ASGD is non-monotonic, but note performance is always low.  
 * The Adam family is good at low rank, but decays to zero with increasing dims.  (And yet it's the winner for transformers..?) 
-* Adagrad is the high-D winner
+* Adagrad is the high-D winner.
 
 ![](fixed_M_variable_N_wd0.png)
 
@@ -52,12 +55,12 @@ Results for "skinny" matrices: M > N, with N plotted on the x-axis, SNR in dB on
 * Adam, AdamW, NAdam and RMSprop all work equivalently OK when $y$ is low-D; 
 * RAdam has a "sweet spot" (?)
 * Adagrad also has a strong sweet spot, and works somewhat when $y$ is high-D; 
-* Rprop fares so poorly compared to "fat" matrices! 
-* The rest don't work well.  
+* Rprop fares very poorly compared to "fat" matrices! 
+* The rest don't work well.
 
 ![](variable_M_variable_N_wd0.png)
 
-Results orthonormal $\Phi$, M=N plotted on the x-axis, SNR in dB on the y-axis.  
+Results for orthonormal $\Phi$, M=N plotted on the x-axis, SNR in dB on the y-axis.  
 * All optimizers work very well learning small matrices, with many meeting (or exceeding!) the linear algebra routines.  
 * Likewise, all algorithms regress to ~ 0 SNR at 1000 x 1000, except for Adagrad, which decays slower to ~ 24 dB.  
 * Adagrad is better than SVD in low dimensions!  
@@ -65,7 +68,11 @@ Results orthonormal $\Phi$, M=N plotted on the x-axis, SNR in dB on the y-axis.
 
 ![](variable_M_variable_N.png)
 
-Above, repeated orthonormal $\Phi$ experiment with weight decay = 0.01.  As expected, weight decay destroys performance for many optimizers in this task.  
+Above, repeated orthonormal $\Phi$ experiment with weight decay = 0.01.  As expected, weight decay (L2 regularization) degrades performance for many optimizers in this simple linear task where overfitting is not possible (exact parameterization). 
+
+## Future experiments: 
+* All non-zero singular values of $\Phi$ are equal; gradient descent normally learns the singular values in order of magnitude, and singular values are always different in the real world. A worthy follow-up would be to vary the magnitudes of the signular values. 
+* This task and network are exactly parameterized, but almost all practical network are overparameterized.  It would not be hard to run tests in the overparameterized regime. 
 
 
 **Please submit a pull request if you find a bug!** I think this all is sound, exp given the presence of positive controls, but I might be wrong!
