@@ -111,7 +111,7 @@ def train(phi, M, N, eplen, algo, scl, device):
 		
 		model = Net(M,N).to(device)
 		lr = 0.01
-		wd = 0.01
+		wd = 0.00
 		if algo < 12:
 			match algo:
 				case 0:
@@ -230,7 +230,7 @@ def do_plot(M, N, repeats, device):
 	figsize = (18, 15)
 	fig, ax = plt.subplots(plot_rows, plot_cols, figsize=figsize)
 	
-	eplen = 500
+	eplen = 2000
 	lossall = np.zeros((13,repeats,eplen))
 	
 	# normalize the l2 norm of y (x is always a unit vector)
@@ -267,11 +267,11 @@ def do_plot(M, N, repeats, device):
 			ax[r,c].tick_params(bottom=True)
 
 	if M > N:
-		fig.savefig(f'fixed_M_variable_N/rotate_loss__wd1e-2_size{N}.png', bbox_inches='tight')
+		fig.savefig(f'fixed_M_variable_N_el2k/rotate_loss__wd1e-2_size{N}.png', bbox_inches='tight')
 	if M < N: 
-		fig.savefig(f'variable_M_fixed_N/rotate_loss__wd1e-2_size{M}.png', bbox_inches='tight')
+		fig.savefig(f'variable_M_fixed_N_el2k/rotate_loss__wd1e-2_size{M}.png', bbox_inches='tight')
 	if M == N: 
-		fig.savefig(f'variable_M_variable_N_wd0/rotate_loss__wd1e-2_size{M}.png', bbox_inches='tight')
+		fig.savefig(f'variable_M_variable_N_el2k/rotate_loss__wd1e-2_size{M}.png', bbox_inches='tight')
 	plt.close(fig)
 	return lossall,names
 
@@ -355,14 +355,15 @@ if __name__ == '__main__':
 			ax[r,c].tick_params(left=True)
 			ax[r,c].tick_params(right=True)
 			ax[r,c].tick_params(bottom=True)
+			ax[r,c].set_ylim(ymin=0)
 		
 		fig.savefig(f'{figname}.png', bbox_inches='tight')
 		fig.savefig(f'{figname}.eps', format='eps', bbox_inches='tight')
 		plt.show()
 
 	if args.mode == 0: 
-		snr_plot(variable_M_variable_N, "[N,N]", "variable_M_variable_N_wd0")
+		snr_plot(variable_M_variable_N, "[N,N]", "variable_M_variable_N_el2k")
 	if args.mode == 1: 
-		snr_plot(fixed_M_variable_N, "[1024,N]", "fixed_M_variable_N")
+		snr_plot(fixed_M_variable_N, "[1024,N]", "fixed_M_variable_N_el2k")
 	if args.mode == 2: 
-		snr_plot(variable_M_fixed_N, "[M,1024]", "variable_M_fixed_N")
+		snr_plot(variable_M_fixed_N, "[M,1024]", "variable_M_fixed_N_el2k")

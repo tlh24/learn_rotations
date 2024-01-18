@@ -25,33 +25,46 @@ Training details:
 * Batch size is fixed at 32.
 * 500 batches were presented during training; from inspection (see movies) this is sufficient except for a few slow cases (SGD).
 * Reported figures are for test loss; however, there was never any difference between test and train loss (unsurprisingly).  
-* Weight decay is set to 0.01, and the learning rate to 0.01 for most of the algorithms (exceptions listed below). 
+* Weight decay is set to 0.0, and the learning rate to 0.01 for most of the algorithms (exceptions listed below). 
 * Performance was compared to Numpy's np.linalg.lstsq -- this is marked as "SVD" on the plot (though internally it may not use SVD.?)
 
 The following optimizers are tested (learning rate, if not 0.01, listed after): Adadelta (0.5), Adagrad (0.1), Adam, AdamW, ASGD, NAdam, RAdam, RMSprop, SGD (0.1), and Lion.  
 The size of $\Phi$ is systematically varied by sweeping M and N from [4 .. 1024) while holding the opposite dimension fixed, and then while varying both so that $\Phi$ was square and orthonormal.  
 
-# Take-aways: 
-1. __In high dimensions, all the optimizers work very poorly.__  
+## Results: 
+1. __In high dimensions, all the optimizers are mediocre to poor.__  
 2. SVD works very well in all instances tested, with orders of magnitude less data.  This serves as a positive control.
-3. There is significant variance between each of the tested optimizers; see plots. 
+3. There is significant variance between each of the tested optimizers:
 
 
-![](variable_M_fixed_N.png)
+![](variable_M_fixed_N_wd0.png)
 
-Above, results for "fat" matrices: M < N, with M plotted on the x-axis, SNR in dB on the y-axis.  The model needs to predict 1024 dimensions using a smaller $x$ - e.g. $y$ is 1024 dimensional but has a lower rank, plotted on the x-axis.  Most algorithms show power-law decay of SNR with increasing rank.  Rprop is great at low rank, shows a sharp transition around 60 - not sure why?  ASGD is non-monotonic, but note performance is always low.  
+Above, results for "fat" matrices: M < N, with M plotted on the x-axis, SNR in dB on the y-axis.  The model needs to predict 1024 dimensions using a smaller $x$ - e.g. $y$ is 1024 dimensional but has a lower rank, plotted on the x-axis.  
+* Most algorithms show power-law decay of SNR with increasing rank.  
+* Rprop is great at low rank, shows a sharp transition around 60 - not sure why?  
+* ASGD is non-monotonic, but note performance is always low.  
+* The Adam family is good at low rank, but decays to zero with increasing dims.  (And yet it's the winner for transformers..?) 
+* Adagrad is the high-D winner
 
-![](fixed_M_variable_N.png)
+![](fixed_M_variable_N_wd0.png)
 
-Results for "skinny" matrices: M > N, with N plotted on the x-axis, SNR in dB on the y-axis.  The model needs to predict N-dim $y$ from 1024-dim $x$, -- find a predictive low-rank subspace.  Adam and AdamW work OK when $y$ is low-D; Adagrad works somewhat when $y$ is high-D; the rest don't work well.  
-
-![](variable_M_variable_N.png)
-
-Results orthonormal $\Phi$, M=N plotted on the x-axis, SNR in dB on the y-axis.  All optimizers work very well learning small matrices, with Rprop being a stand-out winner, with Adam a close second.  Likewise, all algorithms regress to ~ 0 SNR at 1000 x 1000, except for Lion, which has negative SNR (it diverges).  
+Results for "skinny" matrices: M > N, with N plotted on the x-axis, SNR in dB on the y-axis.  The model needs to predict N-dim $y$ from 1024-dim $x$, -- find a predictive low-rank subspace.  
+* Adam, AdamW, NAdam and RMSprop all work equivalently OK when $y$ is low-D; 
+* RAdam has a "sweet spot" (?)
+* Adagrad also has a strong sweet spot, and works somewhat when $y$ is high-D; 
+* The rest don't work well.  
 
 ![](variable_M_variable_N_wd0.png)
 
-Above, repeated orthonormal $\Phi$ experiment with weight decay disabled. 
+Results orthonormal $\Phi$, M=N plotted on the x-axis, SNR in dB on the y-axis.  
+* All optimizers work very well learning small matrices, with many meeting (or exceeding!) the linear algebra routines.  
+* Likewise, all algorithms regress to ~ 0 SNR at 1000 x 1000, except for Adagrad, which decays slower to ~ 24 dB.  
+* Adagrad is better than SVD in low dimensions!  
+* Note that vanilla SGD will retain a SNR of ~25dB, and Adadelta ~32dB, given more data and compute. 
+
+![](variable_M_variable_N.png)
+
+Above, repeated orthonormal $\Phi$ experiment with weight decay = 0.01.  As expected, weight decay destroys performance for many optimizers in this task.  
 
 
 **Please submit a pull request if you find a bug!** I think this all is sound, exp given the presence of positive controls, but I might be wrong!
