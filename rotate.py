@@ -111,7 +111,7 @@ def train(phi, M, N, eplen, algo, scl, device):
 		
 		model = Net(M,N).to(device)
 		lr = 0.01
-		wd = 0.00
+		wd = 0.01
 		if algo < 12:
 			match algo:
 				case 0:
