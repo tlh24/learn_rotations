@@ -11,6 +11,7 @@ from scipy.stats import ortho_group
 import argparse
 import sqlite3
 import time
+import os
 
 batch_size = 32
 
@@ -21,24 +22,27 @@ def create_database_and_table(db_name, table_name):
 
 	# Create table
 	cursor.execute(f'''CREATE TABLE IF NOT EXISTS "{table_name}" 
-							(M INTEGER, N INTEGER, R INTEGER, ALGO INTEGER, SNR REAL, UNIQUE(M, N, R, ALGO))''')
+							(VARIATE INTEGER, ALGO INTEGER, SNR REAL, UNIQUE(VARIATE, ALGO))''')
 	conn.commit()
 	conn.close()
 
-def insert_data(db_name, table_name, m, n, r, algo, snr):
+def insert_data(db_name, table_name, variate, algo, snr):
 	try:
 		# Connect to the SQLite database
 		conn = sqlite3.connect(db_name)
 		cursor = conn.cursor()
 
 		# Insert a row of data
-		cursor.execute(f'REPLACE INTO "{table_name}" (M, N, R, ALGO, SNR) VALUES (?, ?, ?, ?, ?)', (m, n, r, algo, snr))
+		cursor.execute(f'REPLACE INTO "{table_name}" (VARIATE, ALGO, SNR) VALUES (?, ?, ?)', (variate, algo, snr))
 		conn.commit()
 	except sqlite3.OperationalError as e:
 		# Handle database is locked error
 		if "database is locked" in str(e):
 			time.sleep(0.25)  # Wait before retrying
-			insert_data(db_name, table_name, m, n, r, snr)
+			insert_data(db_name, table_name, variate, algo, snr)
+		else: 
+			print(e)
+			exit()
 	finally:
 		conn.close()
 
@@ -92,30 +96,25 @@ def make_rot_matrix(siz):
 		o = o @ m
 	return o
 
-def make_ortho_matrix(M, N):
-	dim = max(M,N)
-	phi = torch.tensor(ortho_group.rvs(dim=dim))
-	return phi[:M, :N]
+# def make_ortho_matrix(M, N):
+# 	dim = max(M,N)
+# 	phi = torch.tensor(ortho_group.rvs(dim=dim))
+# 	return phi[:M, :N]
 
-def make_rr_matrix(siz, rank):
+def make_rr_matrix(M, N, R, scale_sv):
 	# make a non-orthogonal normal matrix with rank less than size
-	o = torch.tensor(ortho_group.rvs(dim=siz), dtype=torch.float32)
-	if rank < siz // 2: 
+	dim = max(M,N)
+	o = torch.tensor(ortho_group.rvs(dim=dim), dtype=torch.float32)
+	if R < dim // 2: 
 		p = torch.flip(o, dims=(1,)) # flip columns/re-use.
 	else:
-		p = torch.tensor(ortho_group.rvs(dim=siz), dtype=torch.float32)
-	# scale the singular values.
-	# s = torch.diag(torch.arange(rank) / rank * 3 + 1)
-	s = torch.eye(rank)
-	return o[:,:rank] @ s @ p[:, :rank].T
-
-# def make_rrz_matrix(siz, rank):
-# 	# make a non-orthogonal normal matrix with rank less than size
-# 	# -- extra columns are zeroed
-# 	o = torch.tensor(ortho_group.rvs(dim=siz), dtype=torch.float32)
-# 	m = torch.zeros(siz,siz)
-# 	m[:,:rank] = o[:,:rank]
-# 	return m
+		p = torch.tensor(ortho_group.rvs(dim=dim), dtype=torch.float32)
+	if scale_sv: # scale the singular values.
+		s = torch.diag(torch.arange(R) / R * 4 + 1)
+	else: 
+		s = torch.eye(R)
+	phi = o[:,:R] @ s @ p[:, :R].T
+	return phi[:M, :N]
 
 # Rotation matrix phi is M by N 
 # Input x is dim M 
@@ -126,7 +125,7 @@ def make_rr_matrix(siz, rank):
 #		x and y are both full rank (M and N respectively). 
 # eplen is the length of the episode
 
-def train(phi, M, R, eplen, algo, scl, device):
+def train(phi, M, N, R, eplen, algo, scl, device):
 	repeats = phi.shape[0]
 	trainlosses = np.zeros((repeats,eplen))
 	testlosses = np.zeros((repeats,eplen))
@@ -134,7 +133,7 @@ def train(phi, M, R, eplen, algo, scl, device):
 	for k in range(repeats): 
 		m = phi[k,:,:]
 		
-		model = Net(M,M).to(device)
+		model = Net(M,N).to(device)
 		lr = 0.01
 		wd = 0.00
 		if algo < 12:
@@ -206,7 +205,7 @@ def train(phi, M, R, eplen, algo, scl, device):
 			y = x @ m_
 			u, s, vh = np.linalg.svd(x, full_matrices=False)
 			# rank = np.sum(s > 1e-4)
-			# print(f'rank of mapping: {rank}; [{M},{R}]') # check! 
+			# print(f'rank of mapping: {rank}; [{M},{N}]{R}') # check! 
 			s = s + (s < 1e-4) * 1e32
 			sp = 1 / s
 			mp = vh.T @ np.diag(sp) @ u.T @ y.numpy()
@@ -220,7 +219,7 @@ def train(phi, M, R, eplen, algo, scl, device):
 			loss = torch.sum((y - p)**2)
 			# lossq = torch.sum((y - q)**2)
 			testlosses[k,1] = loss / batch_size
-			print(f"loss on via linear regression {loss}; done with [{M},{R}]")
+			print(f"loss on via linear regression {loss}; done with [{M},{N}] r:{R}")
 	
 	return trainlosses,testlosses,name
 
@@ -240,11 +239,10 @@ def train(phi, M, R, eplen, algo, scl, device):
 # 		loss = torch.sum((y - p)**2)
 # 		print(f"loss on via linear regression {loss} size [{M},{N}]")
 		
-def calc_scale(M, R, device): 
+def calc_scale(M, N, R, scale_sv, device): 
 	scl = np.zeros((16,))
 	for i in range(16): 
-		phi = make_rr_matrix(M, R).to(device=device, dtype=torch.float32)
-		# phi = make_ortho_matrix(M, N).to(device=device, dtype=torch.float32)
+		phi = make_rr_matrix(M, N, R, scale_sv).to(device=device, dtype=torch.float32)
 		x = random_unit_vectors(batch_size, M, device)
 		x = x.unsqueeze(1)
 		y = x @ phi
@@ -254,7 +252,7 @@ def calc_scale(M, R, device):
 	print(f"scale {ms}")
 	return ms
 
-def do_plot(M, R, repeats, fdir, eplen, device):
+def do_plot(M, N, R, scale_sv, variate, repeats, fdir, eplen, device):
 	plot_rows = 3
 	plot_cols = 4
 	figsize = (18, 15)
@@ -264,17 +262,17 @@ def do_plot(M, R, repeats, fdir, eplen, device):
 	
 	# normalize the l2 norm of y (x is always a unit vector)
 	scl = 1.0
-	if M != R: 
-		scl = calc_scale(M, R, device)
+	if M != N or M != R or N != R: 
+		scl = calc_scale(M, N, R, scale_sv, device)
 	
-	phi = torch.zeros((repeats, M, M), device=device, dtype=torch.float32)
+	phi = torch.zeros((repeats, M, N), device=device, dtype=torch.float32)
 	# use the same phi matrices for all algorithms. 
 	for i in range(repeats):
-		phi[i,:,:] = make_rr_matrix(M, R)
+		phi[i,:,:] = make_rr_matrix(M, N, R, scale_sv)
 	
 	names = []
 	for algo in range(13):
-		trainlosses,testlosses,name = train(phi, M, R, eplen, algo, scl, device)
+		trainlosses,testlosses,name = train(phi, M, N, R, eplen, algo, scl, device)
 		lossall[algo,:,:] = testlosses
 		names.append(name)
 		if algo < 12: 
@@ -282,13 +280,13 @@ def do_plot(M, R, repeats, fdir, eplen, device):
 			c = algo % 4
 			ax[r,c].plot(np.log(trainlosses.T))
 			ax[r,c].plot(np.log(testlosses.T))
-			ax[r,c].set_title(f"{name} [{M},{M}] rank {R}")
+			ax[r,c].set_title(f"{name} [{M},{N}] rank {R}")
 			ax[r,c].set_ylim(ymin=-20, ymax=5.0)
 			ax[r,c].tick_params(left=True)
 			ax[r,c].tick_params(right=True)
 			ax[r,c].tick_params(bottom=True)
 
-	fig.savefig(f'{fdir}/loss_rank{R}.png', bbox_inches='tight')
+	fig.savefig(f'{fdir}/loss_rank{variate}.png', bbox_inches='tight')
 	plt.close(fig)
 	snr = np.zeros((13,))
 	sta = np.mean(lossall[:,:,:4], axis=(1,2))
@@ -297,10 +295,9 @@ def do_plot(M, R, repeats, fdir, eplen, device):
 	fin[12] = np.mean(lossall[12,0,1])
 	snr = 10 * (np.log10(sta) - np.log10(fin))
 	for algo in range(13): 
-		insert_data("snr.db", fdir, R, M, R, algo, snr[algo]) # FIXME !!! 
+		insert_data("snr2.db", fdir, variate, algo, snr[algo])
 		
 	return lossall,names
-
 
 
 if __name__ == '__main__':
@@ -310,86 +307,72 @@ if __name__ == '__main__':
 	parser.add_argument("-l", "--lod", type=int, choices=range(0,20), default=2, help="set the level of detail")
 	parser.add_argument("-r", "--repeats", type=int, choices=range(1,10), default=4, help="number of replicates")
 	parser.add_argument("-c", "--cuda", type=int, choices=range(0,2), default=0, help="set the CUDA device")
-	parser.add_argument("-e", "--episodelength", type=int, choices=range(2,30), default=20, help="set the training length, units of 100")
-	parser.add_argument("-m", "--mode", type=int, choices=range(0,3), default=0, help="set the mode. 0 = variable M variable N; 1 = fixed M variable N; 2 = variable M fixed N")
+	parser.add_argument("-e", "--episodelength", type=int, choices=range(2,30), default=5, help="set the training length, units of 100 so 5 -> 500 steps")
+	parser.add_argument("-m", "--mode", type=int, choices=range(0,4), default=0, help="set the test mode. 0-3, see source.")
+	parser.add_argument("-s", "--scalesv", type=int, choices=range(2), default=0, help="turn off / on singular value scaling")
 	args = parser.parse_args()
 	o = args.offset
 	lod = args.lod
 	repeats = args.repeats
 	eplen = args.episodelength * 100
+	scale_sv = args.scalesv
 
 	device = torch.device(type='cuda', index=args.cuda)
-	fdir = "fixed_M_variable_rank_unscaled_sv_2k"
-	create_database_and_table("snr.db", fdir)
 	
-	# for siz in range(1019, 1024):
-	# 	do_plot(N, siz, repeats, device)
+	print(f"RUN: offset:{o} lod:{lod} repeats:{repeats} eplen:{eplen} cuda:{args.cuda} mode:{args.mode} scalesv:{scale_sv}")
+	
 	def run_variableLOD(fun): 
 		lossall = []
-		if o == 0: 
-			for P in range(2,4):
-				m,n,la,names = fun(P)
-				lossall.append((m,n,la))
+		if o < 2: 
+			fun(2+o)
 		for P in range(4+o,64,lod):
-			m,n,la,names = fun(P)
-			lossall.append((m,n,la))
+			fun(P)
 		for P in range(64+o*2,128,lod*2):
-			m,n,la,names = fun(P)
-			lossall.append((m,n,la))
+			fun(P)
 		for P in range(128+o*4,256,lod*4):
-			m,n,la,names = fun(P)
-			lossall.append((m,n,la))
+			fun(P)
 		for P in range(256+o*8,1025,lod*8):
-			m,n,la,names = fun(P)
-			lossall.append((m,n,la))
-		return lossall,names
+			fun(P)
 			
-	def fixed_M_variable_R(R):
-		M = 1024
-		lossall,names = do_plot(M, R, repeats, fdir, eplen, device)
-		return M,R,lossall,names
+	def run_test(fdir, fun): 
+		os.makedirs(fdir, exist_ok=True)
+		create_database_and_table("snr2.db", fdir)
+		run_variableLOD(fun)
+	
+	scaling = "unscaled_sv"
+	if scale_sv:
+		scaling = "scaled_sv"
+	match args.mode: 
+		case 0: 
+			fdir = f"variable_MNR_{scaling}_{eplen}"
+			def inner(variate):
+				M = variate
+				N = variate
+				R = variate
+				do_plot(M, N, R, scale_sv, variate, repeats, fdir, eplen, device)
+			run_test(fdir,inner)
+		case 1: 
+			fdir = f"variable_M_fixed_NR_{scaling}_{eplen}"
+			def inner(variate):
+				M = variate
+				N = 1024
+				R = 1024
+				do_plot(M, N, R, scale_sv, variate, repeats, fdir, eplen, device)
+			run_test(fdir,inner)
+		case 2: 
+			fdir = f"fixed_M_variable_NR_{scaling}_{eplen}"
+			def inner(variate):
+				M = 1024
+				N = variate
+				R = variate
+				do_plot(M, N, R, scale_sv, variate, repeats, fdir, eplen, device)
+			run_test(fdir,inner)
+		case 3: 
+			fdir = f"fixed_M_fixed_N_variable_R_{scaling}_{eplen}"
+			def inner(variate):
+				M = 1024
+				N = 1024
+				R = variate
+				do_plot(M, N, R, scale_sv, variate, repeats, fdir, eplen, device)
+			run_test(fdir,inner)
 		
-	run_variableLOD(fixed_M_variable_R)
-		
-# 	def snr_plot(fun, xaxisname, figname): 
-# 		lossall,names = run_variableLOD(fun)
-# 		
-# 		plot_rows = 3
-# 		plot_cols = 5
-# 		figsize = (20, 15)
-# 		fig, ax = plt.subplots(plot_rows, plot_cols, figsize=figsize)
-# 		snr = np.zeros((13,len(lossall)))
-# 		os = np.zeros((len(lossall),))
-# 		for algo in range(13): 
-# 			for i in range(len(lossall)): 
-# 				m,n,ls = lossall[i]
-# 				if algo < 12: 
-# 					sta = np.mean(ls[algo,:,:2])
-# 					fin = np.mean(ls[algo,:,-4:])
-# 				else: 
-# 					sta = np.mean(ls[algo,0,0]) # only one repeat for linear regression
-# 					fin = np.mean(ls[algo,0,1])
-# 				os[i] = min(m,n)
-# 				snr[algo,i] = 10 * (np.log10(sta) - np.log10(fin))
-# 				
-# 			r = algo // 5
-# 			c = algo % 5
-# 			ax[r,c].semilogx(os, snr[algo,:])
-# 			ax[r,c].set_title(f"{names[algo]}")
-# 			ax[r,c].set_xlabel(xaxisname)
-# 			ax[r,c].tick_params(left=True)
-# 			ax[r,c].tick_params(right=True)
-# 			ax[r,c].tick_params(bottom=True)
-# 			ax[r,c].set_ylim(ymin=0)
-# 		
-# 		fig.savefig(f'{figname}.png', bbox_inches='tight')
-# 		fig.savefig(f'{figname}.eps', format='eps', bbox_inches='tight')
-# 		plt.show()
-
-	# if args.mode == 0: 
-	# 	snr_plot(variable_M_variable_N, "[N,N]", "variable_M_variable_N_el2k")
-	# if args.mode == 1: 
-	# 	snr_plot(fixed_M_variable_N, "[1024,N]", "fixed_M_variable_N_el2k")
-	# if args.mode == 2: 
-	# 	snr_plot(variable_M_fixed_N, "[M,1024]", "variable_M_fixed_N_el2k")
-	# snr_plot(variable_M_variable_R, "rank", fdir)
