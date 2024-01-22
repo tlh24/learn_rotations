@@ -252,7 +252,7 @@ def calc_scale(M, N, R, scale_sv, device):
 	print(f"scale {ms}")
 	return ms
 
-def do_plot(M, N, R, scale_sv, variate, repeats, fdir, eplen, device):
+def do_plot(M, N, R, scale_sv, variate, repeats, db_name, fdir, eplen, device):
 	plot_rows = 3
 	plot_cols = 4
 	figsize = (18, 15)
@@ -289,13 +289,14 @@ def do_plot(M, N, R, scale_sv, variate, repeats, fdir, eplen, device):
 	fig.savefig(f'{fdir}/loss_rank{variate}.png', bbox_inches='tight')
 	plt.close(fig)
 	snr = np.zeros((13,))
-	sta = np.mean(lossall[:,:,:4], axis=(1,2))
+	sta = np.mean(lossall[:,:,0], axis=(1,))
 	fin = np.mean(lossall[:,:,-4:], axis=(1,2))
-	sta[12] = np.mean(lossall[12,0,0])
+	sta[12] = np.mean(lossall[12,0,0]) # only one repeat
 	fin[12] = np.mean(lossall[12,0,1])
+	sta = np.mean(sta) # average all the starting losses to reduce noise
 	snr = 10 * (np.log10(sta) - np.log10(fin))
 	for algo in range(13): 
-		insert_data("snr2.db", fdir, variate, algo, snr[algo])
+		insert_data(db_name, fdir, variate, algo, snr[algo])
 		
 	return lossall,names
 
@@ -307,7 +308,7 @@ if __name__ == '__main__':
 	parser.add_argument("-l", "--lod", type=int, choices=range(0,20), default=2, help="set the level of detail")
 	parser.add_argument("-r", "--repeats", type=int, choices=range(1,10), default=4, help="number of replicates")
 	parser.add_argument("-c", "--cuda", type=int, choices=range(0,2), default=0, help="set the CUDA device")
-	parser.add_argument("-e", "--episodelength", type=int, choices=range(2,30), default=5, help="set the training length, units of 100 so 5 -> 500 steps")
+	parser.add_argument("-e", "--episodelength", type=int, choices=range(2,30), default=20, help="set the training length, units of 100 so 5 -> 500 steps")
 	parser.add_argument("-m", "--mode", type=int, choices=range(0,4), default=0, help="set the test mode. 0-3, see source.")
 	parser.add_argument("-s", "--scalesv", type=int, choices=range(2), default=0, help="turn off / on singular value scaling")
 	args = parser.parse_args()
@@ -318,6 +319,7 @@ if __name__ == '__main__':
 	scale_sv = args.scalesv
 
 	device = torch.device(type='cuda', index=args.cuda)
+	db_name = "snr4.db"
 	
 	print(f"RUN: offset:{o} lod:{lod} repeats:{repeats} eplen:{eplen} cuda:{args.cuda} mode:{args.mode} scalesv:{scale_sv}")
 	
@@ -336,7 +338,7 @@ if __name__ == '__main__':
 			
 	def run_test(fdir, fun): 
 		os.makedirs(fdir, exist_ok=True)
-		create_database_and_table("snr2.db", fdir)
+		create_database_and_table(db_name, fdir)
 		run_variableLOD(fun)
 	
 	scaling = "unscaled_sv"
@@ -349,7 +351,7 @@ if __name__ == '__main__':
 				M = variate
 				N = variate
 				R = variate
-				do_plot(M, N, R, scale_sv, variate, repeats, fdir, eplen, device)
+				do_plot(M, N, R, scale_sv, variate, repeats, db_name, fdir, eplen, device)
 			run_test(fdir,inner)
 		case 1: 
 			fdir = f"variable_M_fixed_NR_{scaling}_{eplen}"
@@ -357,7 +359,7 @@ if __name__ == '__main__':
 				M = variate
 				N = 1024
 				R = 1024
-				do_plot(M, N, R, scale_sv, variate, repeats, fdir, eplen, device)
+				do_plot(M, N, R, scale_sv, variate, repeats, db_name, fdir, eplen, device)
 			run_test(fdir,inner)
 		case 2: 
 			fdir = f"fixed_M_variable_NR_{scaling}_{eplen}"
@@ -365,7 +367,7 @@ if __name__ == '__main__':
 				M = 1024
 				N = variate
 				R = variate
-				do_plot(M, N, R, scale_sv, variate, repeats, fdir, eplen, device)
+				do_plot(M, N, R, scale_sv, variate, repeats, db_name, fdir, eplen, device)
 			run_test(fdir,inner)
 		case 3: 
 			fdir = f"fixed_M_fixed_N_variable_R_{scaling}_{eplen}"
@@ -373,6 +375,6 @@ if __name__ == '__main__':
 				M = 1024
 				N = 1024
 				R = variate
-				do_plot(M, N, R, scale_sv, variate, repeats, fdir, eplen, device)
+				do_plot(M, N, R, scale_sv, variate, repeats, db_name, fdir, eplen, device)
 			run_test(fdir,inner)
 		
