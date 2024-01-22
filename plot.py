@@ -69,17 +69,19 @@ def plot_data(db_name, table_names, eplen):
 
 			# add in a 'chinchilla' line @ 20x # params.
 			if t % 2 == 0:
+				offst = 0.0
 				match t//2:
 					case 0:
 						chinc = math.sqrt(eplen * 32 / 20.0) # 56.5
 					case 1:
 						chinc = (eplen * 32 / 20.0) / 1024 # e.g. 3.125
 					case 2:
-						chinc = (eplen * 32 / 20.0) / 1024
+						chinc = (eplen * 32 / 20.0) / 1024 + 0.1
+						offst = 4
 					case 3:
 						chinc = 1024 # need 20M samples; clip right
 				if chinc < 1024 and chinc > 2.0 :
-					ax[r,c].semilogx([chinc,chinc], [0.0, ymax[i]], color=colors[t//2], linestyle='dotted')
+					ax[r,c].semilogx([chinc,chinc], [0.0+offst, ymax[i]], color=colors[t//2], linestyle='dotted')
 	fig.legend(loc='outside lower center')
 	fig.savefig(f'{db_name}.eps', format='eps', bbox_inches='tight')
 	plt.show()
