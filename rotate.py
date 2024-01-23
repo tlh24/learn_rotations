@@ -306,7 +306,7 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument("-o", "--offset", type=int, choices=range(0,20), default=0, help="set the offset for iteration")
 	parser.add_argument("-l", "--lod", type=int, choices=range(0,20), default=2, help="set the level of detail")
-	parser.add_argument("-r", "--repeats", type=int, choices=range(1,10), default=5, help="number of replicates")
+	parser.add_argument("-r", "--repeats", type=int, choices=range(1,10), default=8, help="number of replicates")
 	parser.add_argument("-c", "--cuda", type=int, choices=range(0,2), default=0, help="set the CUDA device")
 	parser.add_argument("-e", "--episodelength", type=int, choices=range(2,30), default=5, help="set the training length, units of 100 so 5 -> 500 steps")
 	parser.add_argument("-m", "--mode", type=int, choices=range(0,4), default=0, help="set the test mode. 0-3, see source.")

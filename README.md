@@ -7,7 +7,7 @@ This is a small experiment to answer that question: how well does backprop work 
 $$y = x \Phi$$
 
 The task is to recover $\Phi'$ from $(x,y)$ supervised pairs.
-(Note that $\Phi$ is scaled so that $y$ (length N) is also a unit vector.  This is to reduce gradient scaling issues, and to be consisent with the usual application of LayerNorm)
+(Note that $\Phi$ is scaled so that $y$ (length N) is also a unit vector.  This is to reduce gradient scaling issues, and to be consistent with the usual application of LayerNorm)
 
 This is the "matrix sensing problem", which there is an extensive literature of, eg. https://arxiv.org/abs/2301.11500
 The results presented are an empirical investigation to the problem with controlled rank and exact parameterization, to expose the behavior of commonly-used optimizers.
@@ -46,13 +46,14 @@ Singular values of $\Phi$ were either left unscaled - so that $\Phi$ is a rotati
 
 ![](snr_500.png)
 
-Above, results with training for 500 batches.
+Above, results with training for 500 batches. 
+X-axis is "V"; Y-axis is SNR of fit, in decibels, as measured using test vectors. 
 Solid lines are for unscaled singular values; dashed lines are with them scaled between [4,1] (and later scaled so that $norm_2(y) = 1$)
 As indicated in the legend: 
 * Red = square matrices; 
 * Green = "fat" matrices.  These should be the same result as red - same matrix rank, just replicated over 1024 output dimensions - but vector normalization makes the problem different, as shown. 
 * Blue = "skinny" matrices.  More typical regression situation.  Same number of parameters as red. 
-* Purple = Square 1024 x 1024 matricies with variable rank.  Input space is full, but output space is smaller.  Ada* algorithms work well here. 
+* Purple = Square 1024 x 1024 matrices with variable rank.  Input space is full, but output space is smaller.  Ada* algorithms work well here. 
 
 Dashed vertical line is the "Chinchilla" line where the number of training examples = 20 * number of parameters for square matrices (Red).  Other Chinchilla lines for green and blue are off the chart -- all networks trained below the Chinchilla limit.  See below for more.
 
@@ -70,6 +71,8 @@ To replicate these experiments, run
 
 	./runall.sh -e 5
 	./runall.sh -e 20
+	python plot.py 500
+	python plot.py 2000
 	
 The scripts are set up for 32 cores and 2 GPUs.  Edit run8.sh to suit your system configuration. 
 
