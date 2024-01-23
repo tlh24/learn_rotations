@@ -1,4 +1,4 @@
-# How well does backprop + standard optimizers work in high-D space?
+# How well do backprop + standard optimizers work in high-D space?
 
 Most deep learning models internally use very high dimensional vector representations; large transformers, for example, can use length 12k vectors.  This lead me to wonder how well backprop functions in such high dimensional spaces.  
 
