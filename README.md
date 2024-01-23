@@ -48,14 +48,14 @@ Singular values of $\Phi$ were either left unscaled - so that $\Phi$ is a rotati
 
 Above, results with training for 500 batches. 
 X-axis is "V"; Y-axis is SNR of fit, in decibels, as measured using test vectors. 
-Solid lines are for unscaled singular values; dashed lines are with them scaled between [4,1] (and later scaled so that $norm_2(y) = 1$)
+Solid lines are for unscaled singular values; dashed lines are with them scaled between [4,1] (and later scaled so that $L_2(y) = 1$)
 As indicated in the legend: 
 * Red = square matrices; 
 * Green = "fat" matrices.  These should be the same result as red - same matrix rank, just replicated over 1024 output dimensions - but vector normalization makes the problem different, as shown. 
 * Blue = "skinny" matrices.  More typical regression situation.  Same number of parameters as red. 
 * Purple = Square 1024 x 1024 matrices with variable rank.  Input space is full, but output space is smaller.  Ada* algorithms work well here. 
 
-Dashed vertical line is the "Chinchilla" line where the number of training examples = 20 * number of parameters for square matrices (Red).  Other Chinchilla lines for green and blue are off the chart -- all networks trained below the Chinchilla limit.  See below for more.
+Dashed vertical line is the "Chinchilla" line where the number of training examples = 20 * number of parameters for square matrices (Red).  Other Chinchilla lines for green and blue are off the chart -- they were trained below the Chinchilla limit for all V.  See below for more.
 
 ![](snr_2000.png)
 
@@ -76,4 +76,4 @@ To replicate these experiments, run
 	
 The scripts are set up for 32 cores and 2 GPUs.  Edit run8.sh to suit your system configuration. 
 
-**Please submit a pull request or leave a comment if you have a thought find a bug!** I think this all is sound, exp given the presence of positive controls, but I might be wrong!
+**Please submit a pull request or leave a comment if you have a thought find a bug!** I think this all is sound, exp given the presence of positive controls & the quality of the fits observed, but I might be wrong!
